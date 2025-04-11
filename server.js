@@ -6,11 +6,18 @@ const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const upload = multer({ storage: multer.memoryStorage() });
+cconst upload = multer({ storage: multer.memoryStorage() });
 
 app.post('/merge', upload.fields([{ name: 'audio' }, { name: 'video' }]), (req, res) => {
-const audioPath = req.files['audio'][0].path;
-const videoPath = req.files['video'][0].path;
+const audioBuffer = req.files['audio'][0].buffer;
+const videoBuffer = req.files['video'][0].buffer;
+
+const audioPath = `inputs/audio-${Date.now()}.mp3`;
+const videoPath = `inputs/video-${Date.now()}.mp4`;
+
+fs.writeFileSync(audioPath, audioBuffer);
+fs.writeFileSync(videoPath, videoBuffer);
+
 const outputPath = `outputs/merged-${Date.now()}.mp4`;
 
 if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
