@@ -6,7 +6,7 @@ const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.post('/merge', upload.fields([{ name: 'audio' }, { name: 'video' }]), (req, res) => {
 const audioPath = req.files['audio'][0].path;
