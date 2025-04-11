@@ -20,6 +20,7 @@ fs.writeFileSync(videoPath, videoBuffer);
 
 const outputPath = `outputs/merged-${Date.now()}.mp4`;
 
+if (!fs.existsSync('inputs')) fs.mkdirSync('inputs');  // ✅ เพิ่มตรงนี้
 if (!fs.existsSync('outputs')) fs.mkdirSync('outputs');
 
 ffmpeg()
