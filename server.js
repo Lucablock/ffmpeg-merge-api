@@ -41,7 +41,12 @@ app.post('/merge', upload.fields([{ name: 'audio' }, { name: 'video' }]), (req, 
     ffmpeg()
       .input(videoPath)
       .input(audioPath)
-      .outputOptions('-map 0:v:0', '-map 1:a:0', '-c:v copy', '-shortest')
+      .outputOptions([
+  '-map', '0:v:0',
+  '-map', '1:a:0',
+  '-c:v', 'copy',
+  '-shortest'
+])
       .on('end', () => {
         console.log('✅ Merge complete. Sending file...');
         res.download(outputPath, () => {
