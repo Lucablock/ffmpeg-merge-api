@@ -6,19 +6,26 @@ const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const upload = multer({ storage: multer.memoryStorage() }); // ✅ ใช้ memoryStorage
+const upload = multer({ storage: multer.memoryStorage() }); // ใช้ memory storage
 
-// Ensure folders exist
+// ฟังก์ชันช่วยตรวจสอบโฟลเดอร์
 const ensureFolderExists = (folderPath) => {
   if (!fs.existsSync(folderPath)) {
-    fs.mkdirSync(folderPath, { recursive: true }); // ✅ เผื่ออนาคตต้องสร้างซ้อนกัน
+    fs.mkdirSync(folderPath, { recursive: true });
   }
 };
 
 app.post('/merge', upload.fields([{ name: 'audio' }, { name: 'video' }]), (req, res) => {
   try {
-    const audioBuffer = req.files['audio'][0].buffer;
-    const videoBuffer = req.files['video'][0].buffer;
+    const audioFile = req.files?.['audio']?.[0];
+    const videoFile = req.files?.['video']?.[0];
+
+    if (!audioFile || !videoFile) {
+      return res.status(400).send('❌ Missing audio or video file');
+    }
+
+    const audioBuffer = audioFile.buffer;
+    const videoBuffer = videoFile.buffer;
 
     ensureFolderExists('inputs');
     ensureFolderExists('outputs');
@@ -36,7 +43,9 @@ app.post('/merge', upload.fields([{ name: 'audio' }, { name: 'video' }]), (req, 
       .input(audioPath)
       .outputOptions('-map 0:v:0', '-map 1:a:0', '-c:v copy', '-shortest')
       .on('end', () => {
+        console.log('✅ Merge complete. Sending file...');
         res.download(outputPath, () => {
+          // ลบไฟล์ทั้งหมดหลังส่งเสร็จ
           fs.unlinkSync(audioPath);
           fs.unlinkSync(videoPath);
           fs.unlinkSync(outputPath);
@@ -47,7 +56,6 @@ app.post('/merge', upload.fields([{ name: 'audio' }, { name: 'video' }]), (req, 
         res.status(500).send('Merge failed: ' + err.message);
       })
       .save(outputPath);
-
   } catch (err) {
     console.error('❌ Server Error:', err.message);
     res.status(500).send('Unexpected error: ' + err.message);
