@@ -8,7 +8,6 @@ const app = express();
 const port = process.env.PORT || 3000;
 const upload = multer({ storage: multer.memoryStorage() }); // ใช้ memory storage
 
-// ฟังก์ชันช่วยตรวจสอบโฟลเดอร์
 const ensureFolderExists = (folderPath) => {
   if (!fs.existsSync(folderPath)) {
     fs.mkdirSync(folderPath, { recursive: true });
@@ -38,29 +37,50 @@ app.post('/merge', upload.fields([{ name: 'audio' }, { name: 'video' }]), (req, 
     fs.writeFileSync(audioPath, audioBuffer);
     fs.writeFileSync(videoPath, videoBuffer);
 
-    ffmpeg()
-      .input(audioPath)
-      .input(videoPath)
-      .outputOptions([
-        '-map', '0:v:0?',
-        '-map', '1:a:0?',
-        '-c:v', 'copy',
-        '-shortest'
-       ])
-      .on('end', () => {
-        console.log('✅ Merge complete. Sending file...');
-        res.download(outputPath, () => {
-          // ลบไฟล์ทั้งหมดหลังส่งเสร็จ
-          fs.unlinkSync(audioPath);
-          fs.unlinkSync(videoPath);
-          fs.unlinkSync(outputPath);
-        });
-      })
-      .on('error', (err) => {
-        console.error('❌ FFmpeg Error:', err.message);
-        res.status(500).send('Merge failed: ' + err.message);
-      })
-      .save(outputPath);
+    // ตรวจสอบ metadata ด้วย ffprobe ก่อน merge
+    ffmpeg.ffprobe(videoPath, (err, metadata) => {
+      if (err) {
+        console.error('❌ FFprobe Error:', err.message);
+        return res.status(500).send('Failed to analyze video file');
+      }
+
+      const hasVideoStream = metadata.streams.some(s => s.codec_type === 'video');
+      const hasAudioStream = metadata.streams.some(s => s.codec_type === 'audio');
+
+      console.log('🎥 Video has stream:', hasVideoStream);
+      console.log('🎧 Video has audio:', hasAudioStream);
+
+      if (!hasVideoStream) {
+        return res.status(400).send('❌ No video stream found in the uploaded file');
+      }
+
+      ffmpeg()
+        .input(videoPath) // วิดีโอต้องมาก่อน
+        .input(audioPath)
+        .outputOptions([
+          '-map', '0:v:0',
+          '-map', '1:a:0',
+          '-c:v', 'copy',
+          '-shortest'
+        ])
+        .on('start', (cmd) => {
+          console.log('🚀 FFmpeg command:', cmd);
+        })
+        .on('end', () => {
+          console.log('✅ Merge complete. Sending file...');
+          res.download(outputPath, () => {
+            fs.unlinkSync(audioPath);
+            fs.unlinkSync(videoPath);
+            fs.unlinkSync(outputPath);
+          });
+        })
+        .on('error', (err) => {
+          console.error('❌ FFmpeg Error:', err.message);
+          res.status(500).send('Merge failed: ' + err.message);
+        })
+        .save(outputPath);
+    });
+
   } catch (err) {
     console.error('❌ Server Error:', err.message);
     res.status(500).send('Unexpected error: ' + err.message);
