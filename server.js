@@ -46,6 +46,7 @@ app.post('/merge', upload.fields([{ name: 'audio' }, { name: 'video' }]), (req, 
 
       const hasVideoStream = metadata.streams.some(s => s.codec_type === 'video');
       const hasAudioStream = metadata.streams.some(s => s.codec_type === 'audio');
+      console.log('🧠 FFprobe metadata:', metadata);
 
       console.log('🎥 Video has stream:', hasVideoStream);
       console.log('🎧 Video has audio:', hasAudioStream);
