@@ -1,72 +1,60 @@
 const express = require('express');
 const multer = require('multer');
+const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const path = require('path');
-const ffmpeg = require('fluent-ffmpeg');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const port = process.env.PORT || 3000;
-const upload = multer({ storage: multer.memoryStorage() });
 
-// สร้างโฟลเดอร์สำหรับ temp ถ้ายังไม่มี
+const upload = multer({ dest: 'uploads/' });
+
+// ตรวจสอบว่าโฟลเดอร์ exists หรือยัง
 const ensureFolderExists = (folderPath) => {
   if (!fs.existsSync(folderPath)) {
     fs.mkdirSync(folderPath, { recursive: true });
   }
 };
 
-app.post('/merge', upload.any(), async (req, res) => {
-  try {
-    ensureFolderExists('inputs');
-    ensureFolderExists('outputs');
+ensureFolderExists('uploads');
+ensureFolderExists('output');
 
-    const timestamp = Date.now();
-    const inputFiles = [];
+app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, res) => {
+  const video = req.files['video']?.[0];
+  const audio = req.files['audio']?.[0];
 
-    // 🔁 1. เขียนไฟล์ทั้งหมดลง disk
-    for (let i = 0; i < req.files.length; i++) {
-      const field = req.files[i];
-      const filePath = `inputs/input-${i}-${timestamp}.wav`;
-      fs.writeFileSync(filePath, field.buffer);
-      inputFiles.push(filePath);
-    }
-
-    // 🔧 2. เตรียม input.txt สำหรับ FFmpeg
-    const concatFilePath = `inputs/list-${timestamp}.txt`;
-    const concatList = inputFiles.map(f => `file '${f}'`).join('\n');
-    fs.writeFileSync(concatFilePath, concatList);
-
-    // 📦 3. ตั้งค่า path output
-    const outputPath = `outputs/merged-${timestamp}.wav`;
-
-    // ▶️ 4. ใช้ FFmpeg รวม
-    ffmpeg()
-      .input(concatFilePath)
-      .inputOptions(['-f', 'concat', '-safe', '0'])
-      .outputOptions(['-c', 'copy'])
-      .on('start', (cmd) => console.log('🚀 FFmpeg:', cmd))
-      .on('end', () => {
-        console.log('✅ Merge done');
-        res.download(outputPath, () => {
-          [...inputFiles, concatFilePath, outputPath].forEach(f => fs.unlinkSync(f));
-        });
-      })
-      .on('error', (err) => {
-        console.error('❌ FFmpeg Error:', err.message);
-        res.status(500).send('Merge error: ' + err.message);
-      })
-      .save(outputPath);
-
-  } catch (err) {
-    console.error('❌ Server Error:', err.message);
-    res.status(500).send('Unexpected error: ' + err.message);
+  if (!video || !audio) {
+    return res.status(400).send('Missing video or audio file.');
   }
-});
 
-app.get('/', (req, res) => {
-  res.send('✅ FFmpeg Merge API is ready');
+  const outputFileName = `${uuidv4()}.mp4`;
+  const outputPath = path.join('output', outputFileName);
+
+  ffmpeg()
+    .input(video.path)
+    .input(audio.path)
+    .outputOptions([
+      '-c:v copy',         // ใช้วิดีโอเดิม ไม่เข้ารหัสใหม่
+      '-c:a aac',          // แปลงเสียงเป็น AAC (รองรับบนทุกแพลตฟอร์ม)
+      '-shortest'          // ตัดให้จบตามความยาวไฟล์ที่สั้นที่สุด (ป้องกันเสียง/ภาพล้น)
+    ])
+    .on('error', (err) => {
+      console.error('FFmpeg error:', err.message);
+      res.status(500).send('Error during merging.');
+    })
+    .on('end', () => {
+      res.setHeader('Content-Type', 'video/mp4');
+      res.sendFile(path.resolve(outputPath), () => {
+        // ลบไฟล์หลังส่งเสร็จ
+        fs.unlinkSync(video.path);
+        fs.unlinkSync(audio.path);
+        fs.unlinkSync(outputPath);
+      });
+    })
+    .save(outputPath);
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Listening on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });
