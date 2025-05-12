@@ -30,21 +30,14 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
   const outputFileName = `${uuidv4()}.mp4`;
   const outputPath = path.join('output', outputFileName);
 
-  // ✅ ตรวจสอบว่า video มี stream จริง
   ffmpeg.ffprobe(video.path, (err, metadata) => {
-    if (err) {
-      console.error('ffprobe error:', err.message);
-      return res.status(500).send('Error probing video file.');
+    if (err || !metadata.streams.find(s => s.codec_type === 'video')) {
+      return res.status(400).send('The uploaded video file does not contain a video stream.');
     }
 
-    const hasVideoStream = metadata.streams.some(stream => stream.codec_type === 'video');
-    if (!hasVideoStream) {
-      return res.status(400).send('The uploaded file does not contain a video stream.');
-    }
-
-    // ⚙️ ดำเนินการ merge
     ffmpeg()
       .input(video.path)
+      .inputFormat('mp4')
       .input(audio.path)
       .outputOptions([
         '-c:v copy',
@@ -58,7 +51,6 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
       .on('end', () => {
         res.setHeader('Content-Type', 'video/mp4');
         res.sendFile(path.resolve(outputPath), () => {
-          // 🧹 ล้างไฟล์หลังส่ง
           fs.unlinkSync(video.path);
           fs.unlinkSync(audio.path);
           fs.unlinkSync(outputPath);
