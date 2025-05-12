@@ -10,7 +10,6 @@ const port = process.env.PORT || 3000;
 
 const upload = multer({ dest: 'uploads/' });
 
-// ตรวจสอบว่าโฟลเดอร์ exists หรือยัง
 const ensureFolderExists = (folderPath) => {
   if (!fs.existsSync(folderPath)) {
     fs.mkdirSync(folderPath, { recursive: true });
@@ -35,9 +34,11 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
     .input(video.path)
     .input(audio.path)
     .outputOptions([
-      '-c:v copy',         // ใช้วิดีโอเดิม ไม่เข้ารหัสใหม่
-      '-c:a aac',          // แปลงเสียงเป็น AAC (รองรับบนทุกแพลตฟอร์ม)
-      '-shortest'          // ตัดให้จบตามความยาวไฟล์ที่สั้นที่สุด (ป้องกันเสียง/ภาพล้น)
+      '-map 0:v:0',         // ใช้วิดีโอจาก input 0
+      '-map 1:a:0',         // ใช้เสียงจาก input 1
+      '-c:v copy',          // ใช้วิดีโอดั้งเดิม ไม่ re-encode
+      '-c:a aac',           // แปลงเสียงเป็น AAC (รองรับ universal)
+      '-shortest'           // จบเมื่อวิดีโอหรือเสียงจบก่อน
     ])
     .on('error', (err) => {
       console.error('FFmpeg error:', err.message);
@@ -46,7 +47,6 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
     .on('end', () => {
       res.setHeader('Content-Type', 'video/mp4');
       res.sendFile(path.resolve(outputPath), () => {
-        // ลบไฟล์หลังส่งเสร็จ
         fs.unlinkSync(video.path);
         fs.unlinkSync(audio.path);
         fs.unlinkSync(outputPath);
@@ -56,5 +56,5 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`✅ Server is running on port ${port}`);
 });
