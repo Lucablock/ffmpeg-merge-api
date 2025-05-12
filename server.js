@@ -33,7 +33,7 @@ app.post('/merge', upload.any(), async (req, res) => {
 
     // 🔧 2. เตรียม input.txt สำหรับ FFmpeg
     const concatFilePath = `inputs/list-${timestamp}.txt`;
-    const concatList = inputFiles.map(f => `file '${path.resolve(f)}'`).join('\n');
+    const concatList = inputFiles.map(f => `file '${f}'`).join('\n');
     fs.writeFileSync(concatFilePath, concatList);
 
     // 📦 3. ตั้งค่า path output
