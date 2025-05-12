@@ -30,31 +30,44 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
   const outputFileName = `${uuidv4()}.mp4`;
   const outputPath = path.join('output', outputFileName);
 
-  ffmpeg()
-    .input(video.path)
-    .input(audio.path)
-    .outputOptions([
-      '-map 0:v:0',         // ใช้วิดีโอจาก input 0
-      '-map 1:a:0',         // ใช้เสียงจาก input 1
-      '-c:v copy',          // ใช้วิดีโอดั้งเดิม ไม่ re-encode
-      '-c:a aac',           // แปลงเสียงเป็น AAC (รองรับ universal)
-      '-shortest'           // จบเมื่อวิดีโอหรือเสียงจบก่อน
-    ])
-    .on('error', (err) => {
-      console.error('FFmpeg error:', err.message);
-      res.status(500).send('Error during merging.');
-    })
-    .on('end', () => {
-      res.setHeader('Content-Type', 'video/mp4');
-      res.sendFile(path.resolve(outputPath), () => {
-        fs.unlinkSync(video.path);
-        fs.unlinkSync(audio.path);
-        fs.unlinkSync(outputPath);
-      });
-    })
-    .save(outputPath);
+  // ✅ ตรวจสอบว่า video มี stream จริง
+  ffmpeg.ffprobe(video.path, (err, metadata) => {
+    if (err) {
+      console.error('ffprobe error:', err.message);
+      return res.status(500).send('Error probing video file.');
+    }
+
+    const hasVideoStream = metadata.streams.some(stream => stream.codec_type === 'video');
+    if (!hasVideoStream) {
+      return res.status(400).send('The uploaded file does not contain a video stream.');
+    }
+
+    // ⚙️ ดำเนินการ merge
+    ffmpeg()
+      .input(video.path)
+      .input(audio.path)
+      .outputOptions([
+        '-c:v copy',
+        '-c:a aac',
+        '-shortest'
+      ])
+      .on('error', (err) => {
+        console.error('FFmpeg error:', err.message);
+        res.status(500).send('Error during merging.');
+      })
+      .on('end', () => {
+        res.setHeader('Content-Type', 'video/mp4');
+        res.sendFile(path.resolve(outputPath), () => {
+          // 🧹 ล้างไฟล์หลังส่ง
+          fs.unlinkSync(video.path);
+          fs.unlinkSync(audio.path);
+          fs.unlinkSync(outputPath);
+        });
+      })
+      .save(outputPath);
+  });
 });
 
 app.listen(port, () => {
-  console.log(`✅ Server is running on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });
