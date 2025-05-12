@@ -14,10 +14,12 @@ const ensureFolderExists = (folderPath) => {
   }
 };
 
-app.post('/merge', upload.fields([{ name: 'audio' }, { name: 'video' }]), (req, res) => {
+// ✅ เปลี่ยนมาใช้ upload.any() เพื่อรองรับ field name จาก n8n (file_0, file_1, ...)
+app.post('/merge', upload.any(), (req, res) => {
   try {
-    const audioFile = req.files?.['audio']?.[0];
-    const videoFile = req.files?.['video']?.[0];
+    // ✅ ดึงไฟล์ตามชื่อ field ที่ส่งจาก n8n (เช่น file_0, file_1)
+    const audioFile = req.files?.find(f => f.fieldname === 'file_0');
+    const videoFile = req.files?.find(f => f.fieldname === 'file_1');
 
     if (!audioFile || !videoFile) {
       return res.status(400).send('❌ Missing audio or video file');
