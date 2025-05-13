@@ -11,7 +11,7 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 ffmpeg.setFfprobePath(ffprobePath);
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080;
 const upload = multer({ dest: 'uploads/' });
 
 // Ensure folders exist
