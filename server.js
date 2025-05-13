@@ -49,6 +49,7 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
     // ✅ ดำเนินการ merge หากตรวจสอบผ่าน
     ffmpeg()
       .input(video.path)
+      .noAudio()
       .input(audio.path)
       .outputOptions([
         '-c:v copy',
