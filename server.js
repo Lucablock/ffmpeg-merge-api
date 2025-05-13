@@ -60,13 +60,14 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
       .noAudio()
       .input(audio.path)
       .outputOptions([
-        '-map 0:v:0',
-        '-map 1:a:0',
-        '-c:v copy',
-        '-c:a aac',
-        '-shortest',
-        '-loglevel', 'verbose'  // ให้ FFmpeg แสดงรายละเอียด
-      ])
+      '-map 0:v',
+      '-map 1:a',
+      '-c:v copy',
+      '-c:a aac',
+      '-b:a 192k',
+      '-movflags +faststart',
+      '-shortest'
+    ])
       .on('start', (cmd) => {
         console.log('▶️ FFmpeg started with command:', cmd);
       })
@@ -78,6 +79,9 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
         console.log('❗ STDOUT:', stdout);
         console.log('❗ STDERR:', stderr);
         return res.status(500).send('FFmpeg error');
+      })
+      .on('stderr', (line) => {
+      console.log('📢 FFmpeg stderr:', line);
       })
       .on('end', () => {
         console.log('✅ FFmpeg MERGE DONE. Sending file:', outputPath);
