@@ -55,33 +55,30 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
 
     console.log('✅ FFmpeg inputs ready...');
 
-    const command = ffmpeg()
+    ffmpeg()
       .input(video.path)
-      .noAudio()
+      .noAudio() // ลบเสียงเดิมออกจากวิดีโอ
       .input(audio.path)
       .outputOptions([
-      '-map 0:v',
-      '-map 1:a',
-      '-c:v copy',
-      '-c:a aac',
-      '-b:a 192k',
-      '-movflags +faststart',
-      '-shortest'
-    ])
+        '-map 0:v',
+        '-map 1:a',
+        '-c:v copy',
+        '-c:a aac',
+        '-b:a 192k',
+        '-movflags +faststart',
+        '-shortest'
+      ])
       .on('start', (cmd) => {
         console.log('▶️ FFmpeg started with command:', cmd);
       })
       .on('stderr', (line) => {
-        console.log('[FFmpeg]', line);  // Log ทุกบรรทัดจาก FFmpeg
+        console.log('📢 FFmpeg stderr:', line);
       })
       .on('error', (err, stdout, stderr) => {
         console.error('❌ FFmpeg ERROR:', err.message);
         console.log('❗ STDOUT:', stdout);
         console.log('❗ STDERR:', stderr);
         return res.status(500).send('FFmpeg error');
-      })
-      .on('stderr', (line) => {
-      console.log('📢 FFmpeg stderr:', line);
       })
       .on('end', () => {
         console.log('✅ FFmpeg MERGE DONE. Sending file:', outputPath);
@@ -98,10 +95,10 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
             console.log('🧹 Cleaned up temporary files.');
           }
         });
-      });
+      })
+      .save(outputPath);
 
     console.log('💾 Saving with FFmpeg...');
-    command.save(outputPath);
   });
 });
 
