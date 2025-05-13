@@ -24,6 +24,8 @@ ensureFolderExists('uploads');
 ensureFolderExists('output');
 
 app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, res) => {
+  console.log('🔥 MERGE ENDPOINT CALLED');
+
   const video = req.files['video']?.[0];
   const audio = req.files['audio']?.[0];
 
@@ -35,9 +37,9 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
   const outputFileName = `${uuidv4()}.mp4`;
   const outputPath = path.join('output', outputFileName);
 
-  console.log('🟡 Received video file:', video.originalname, video.path);
-  console.log('🟡 Received audio file:', audio.originalname, audio.path);
-  console.log('🟡 Output path will be:', outputPath);
+  console.log('📁 VIDEO RECEIVED:', video.originalname, video.path);
+  console.log('📁 AUDIO RECEIVED:', audio.originalname, audio.path);
+  console.log('📦 Output path will be:', outputPath);
 
   // ตรวจสอบว่า video มี stream จริงหรือไม่
   ffmpeg.ffprobe(video.path, (err, metadata) => {
@@ -69,11 +71,11 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
         console.log('▶️ FFmpeg started with command:', commandLine);
       })
       .on('error', (err) => {
-        console.error('❌ FFmpeg error:', err.message);
-        res.status(500).send('Error during merging.');
+        console.error('❌ FFmpeg ERROR:', err.message);
+        res.status(500).send('FFmpeg error');
       })
       .on('end', () => {
-        console.log('✅ FFmpeg merge finished. Sending file:', outputPath);
+        console.log('✅ FFmpeg MERGE DONE. Sending file:', outputPath);
 
         res.setHeader('Content-Type', 'video/mp4');
         res.sendFile(path.resolve(outputPath), (err) => {
