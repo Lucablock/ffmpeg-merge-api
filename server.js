@@ -28,46 +28,64 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
   const audio = req.files['audio']?.[0];
 
   if (!video || !audio) {
+    console.log('❌ Missing video or audio file.');
     return res.status(400).send('Missing video or audio file.');
   }
 
   const outputFileName = `${uuidv4()}.mp4`;
   const outputPath = path.join('output', outputFileName);
 
-  // ✅ ตรวจสอบว่าไฟล์ video มี stream จริงหรือไม่
+  console.log('🟡 Received video file:', video.originalname, video.path);
+  console.log('🟡 Received audio file:', audio.originalname, audio.path);
+  console.log('🟡 Output path will be:', outputPath);
+
+  // ตรวจสอบว่า video มี stream จริงหรือไม่
   ffmpeg.ffprobe(video.path, (err, metadata) => {
     if (err) {
-      console.error('FFprobe error:', err);
+      console.error('❌ FFprobe error:', err);
       return res.status(500).send('Cannot analyze video file.');
     }
 
     const hasVideoStream = metadata.streams.some(s => s.codec_type === 'video');
     if (!hasVideoStream) {
+      console.log('❌ Uploaded video has no video stream.');
       return res.status(400).send('Uploaded file does not contain a video stream.');
     }
 
-    // ✅ ดำเนินการ merge หากตรวจสอบผ่าน
+    // เริ่ม merge ด้วย FFmpeg
+    console.log('🚀 Starting FFmpeg merge...');
     ffmpeg()
       .input(video.path)
-      .noAudio()
+      .noAudio() // ลบเสียงเดิม
       .input(audio.path)
       .outputOptions([
-       '-map 0:v:0',       // ใช้เฉพาะ video stream จาก video input
-       '-map 1:a:0',       // ใช้เฉพาะ audio stream จาก TTS input
-       '-c:v copy',        // ไม่แปลงวิดีโอ
-       '-c:a aac',         // แปลงเสียงเป็น AAC
-       '-shortest'         // หยุดตามเสียง
-     ])
+        '-map 0:v:0',
+        '-map 1:a:0',
+        '-c:v copy',
+        '-c:a aac',
+        '-shortest'
+      ])
+      .on('start', (commandLine) => {
+        console.log('▶️ FFmpeg started with command:', commandLine);
+      })
       .on('error', (err) => {
-        console.error('FFmpeg error:', err.message);
+        console.error('❌ FFmpeg error:', err.message);
         res.status(500).send('Error during merging.');
       })
       .on('end', () => {
+        console.log('✅ FFmpeg merge finished. Sending file:', outputPath);
+
         res.setHeader('Content-Type', 'video/mp4');
-        res.sendFile(path.resolve(outputPath), () => {
-          fs.unlinkSync(video.path);
-          fs.unlinkSync(audio.path);
-          fs.unlinkSync(outputPath);
+        res.sendFile(path.resolve(outputPath), (err) => {
+          if (err) {
+            console.error('❌ Error sending merged file:', err);
+          } else {
+            console.log('📤 File sent successfully!');
+            fs.unlinkSync(video.path);
+            fs.unlinkSync(audio.path);
+            fs.unlinkSync(outputPath);
+            console.log('🧹 Cleaned up temporary files.');
+          }
         });
       })
       .save(outputPath);
@@ -75,5 +93,5 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`🚀 FFmpeg merge server is running on port ${port}`);
 });
