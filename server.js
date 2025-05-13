@@ -57,7 +57,6 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
 
     ffmpeg()
       .input(video.path)
-      .noAudio() // ลบเสียงเดิมออกจากวิดีโอ
       .input(audio.path)
       .outputOptions([
         '-map 0:v',
