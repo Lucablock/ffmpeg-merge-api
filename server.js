@@ -52,10 +52,12 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
       .noAudio()
       .input(audio.path)
       .outputOptions([
-        '-c:v copy',
-        '-c:a aac',
-        '-shortest'
-      ])
+       '-map 0:v:0',       // ใช้เฉพาะ video stream จาก video input
+       '-map 1:a:0',       // ใช้เฉพาะ audio stream จาก TTS input
+       '-c:v copy',        // ไม่แปลงวิดีโอ
+       '-c:a aac',         // แปลงเสียงเป็น AAC
+       '-shortest'         // หยุดตามเสียง
+     ])
       .on('error', (err) => {
         console.error('FFmpeg error:', err.message);
         res.status(500).send('Error during merging.');
