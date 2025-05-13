@@ -41,7 +41,6 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
   console.log('📁 AUDIO RECEIVED:', audio.originalname, audio.path);
   console.log('📦 Output path will be:', outputPath);
 
-  // ตรวจสอบว่า video มี stream จริงหรือไม่
   ffmpeg.ffprobe(video.path, (err, metadata) => {
     if (err) {
       console.error('❌ FFprobe error:', err);
@@ -54,25 +53,31 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
       return res.status(400).send('Uploaded file does not contain a video stream.');
     }
 
-    // เริ่ม merge ด้วย FFmpeg
-    console.log('🚀 Starting FFmpeg merge...');
-    ffmpeg()
+    console.log('✅ FFmpeg inputs ready...');
+
+    const command = ffmpeg()
       .input(video.path)
-      .noAudio() // ลบเสียงเดิม
+      .noAudio()
       .input(audio.path)
       .outputOptions([
         '-map 0:v:0',
         '-map 1:a:0',
         '-c:v copy',
         '-c:a aac',
-        '-shortest'
+        '-shortest',
+        '-loglevel', 'verbose'  // ให้ FFmpeg แสดงรายละเอียด
       ])
-      .on('start', (commandLine) => {
-        console.log('▶️ FFmpeg started with command:', commandLine);
+      .on('start', (cmd) => {
+        console.log('▶️ FFmpeg started with command:', cmd);
       })
-      .on('error', (err) => {
+      .on('stderr', (line) => {
+        console.log('[FFmpeg]', line);  // Log ทุกบรรทัดจาก FFmpeg
+      })
+      .on('error', (err, stdout, stderr) => {
         console.error('❌ FFmpeg ERROR:', err.message);
-        res.status(500).send('FFmpeg error');
+        console.log('❗ STDOUT:', stdout);
+        console.log('❗ STDERR:', stderr);
+        return res.status(500).send('FFmpeg error');
       })
       .on('end', () => {
         console.log('✅ FFmpeg MERGE DONE. Sending file:', outputPath);
@@ -89,8 +94,10 @@ app.post('/merge', upload.fields([{ name: 'video' }, { name: 'audio' }]), (req, 
             console.log('🧹 Cleaned up temporary files.');
           }
         });
-      })
-      .save(outputPath);
+      });
+
+    console.log('💾 Saving with FFmpeg...');
+    command.save(outputPath);
   });
 });
 
